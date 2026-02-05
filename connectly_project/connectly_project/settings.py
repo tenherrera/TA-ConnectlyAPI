@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'posts',
     'django_extensions',
-
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -121,7 +121,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 # HTTPS Settings
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000

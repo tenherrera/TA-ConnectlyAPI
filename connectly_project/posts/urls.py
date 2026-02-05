@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import UserListCreate, PostListCreate, CommentListCreate
+from .views import UserListCreate, PostListCreate, CommentListCreate, CreatePostView
 
 urlpatterns = [
     # path('users/', views.get_users, name='get_users'),
@@ -13,4 +13,5 @@ urlpatterns = [
     path('login/', views.verify_password, name='verify_password'),
     path('posts/<int:pk>/', views.PostDetailView.as_view(), name='post_detail'),
     path('protected/', views.ProtectedView.as_view(), name='protected'),
+    path('factory/', CreatePostView.as_view(), name='post-factory'),
 ]

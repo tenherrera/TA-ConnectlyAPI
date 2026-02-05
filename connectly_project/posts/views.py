@@ -1,8 +1,8 @@
 import json
+from singletons.logger_singleton import LoggerSingleton
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from .models import Post
-from .models import User
+from .models import Post, User, Comment  # Added Comment here
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsPostAuthor
@@ -12,6 +12,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework import status
 from .serializers import UserSerializer, PostSerializer, CommentSerializer
 from django.contrib.auth import login
+from factories.post_factory import PostFactory
+from rest_framework.authtoken.models import Token
 
 
 # Function 1: To get users
@@ -62,7 +64,7 @@ def create_post(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
         
-# New Function: Verify Passwords (Fixed Indentation)
+# New Function: Verify Passwords
 @csrf_exempt
 def verify_password(request):
     if request.method == 'POST':
@@ -70,20 +72,19 @@ def verify_password(request):
             data = json.loads(request.body)
             username = data.get('username')
             password = data.get('password')
-
-            # INSTRUCTION: Use the authenticate method to validate credentials
             user = authenticate(username=username, password=password)
 
             if user is not None:
                 login(request, user)
-                return JsonResponse({'message': 'Authentication successful!'})
+                
+                token, _ = Token.objects.get_or_create(user=user)
+
+                return JsonResponse({'token': token.key, 'message': 'Authentication successful!'})
             else:
                 return JsonResponse({'error': 'Invalid credentials.'}, status=401)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
-
-# --- Class-Based Views ---
 
 class UserListCreate(APIView):
     def get(self, request):
@@ -101,17 +102,31 @@ class UserListCreate(APIView):
 
 class PostListCreate(APIView):
     def get(self, request):
+        # Initialize the logger
+        logger = LoggerSingleton().get_logger()
+        logger.info("User requested the list of posts!")
+        
         posts = Post.objects.all()
         serializer = PostSerializer(posts, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = PostSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Call the Factory to handle the heavy lifting
+            new_post = PostFactory.create_post(
+                post_type=request.data.get('post_type'),
+                title=request.data.get('title'),
+                author=request.user, # The logged-in user
+                content=request.data.get('content'),
+                metadata=request.data.get('metadata')
+            )
 
+            # Serialize the result to return it to the user
+            return Response(PostSerializer(new_post).data, status=status.HTTP_201_CREATED)
+
+        except ValueError as e:
+            # This catches our Factory errors (like missing video duration)
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class CommentListCreate(APIView):
     def get(self, request):
@@ -159,3 +174,22 @@ class ProtectedView(APIView):
 
     def get(self, request):
         return Response({"message": "Authenticated!"})
+    
+class CreatePostView(APIView):
+    # Ensure only logged-in users can create posts
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated] 
+
+    def post(self, request):
+        data = request.data
+        try:
+            post = PostFactory.create_post(
+                post_type=data['post_type'],
+                title=data['title'],
+                author=request.user,  # We use the logged-in user as the author
+                content=data.get('content', ''),
+                metadata=data.get('metadata', {})
+            )
+            return Response({'message': 'Post created successfully!', 'post_id': post.id}, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
