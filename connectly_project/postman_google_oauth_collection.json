@@ -1,0 +1,175 @@
+{
+  "info": {
+    "name": "Connectly - Google OAuth",
+    "description": "Google OAuth login testing for Connectly API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "mockIdToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkiLCJlbWFpbCI6InRlc3R1c2VyQGdtYWlsLmNvbSIsIm5hbWUiOiJUZXN0IFVzZXIiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXVkIjoiWU9VUl9HT09HTEVDTGNFOVEVCVJ1UklEX0hFUkUiLCJpYXQiOjEyMzQ1Njc4OTAsImV4cCI6OTk5OTk5OTk5OX0.fake_signature"
+    }
+  ],
+  "item": [
+    {
+      "name": "Google OAuth - New User Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_token\": \"{{mockIdToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/auth/google/login/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "auth",
+            "google",
+            "login",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Google OAuth - Missing ID Token (Error)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/auth/google/login/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "auth",
+            "google",
+            "login",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Google OAuth - Invalid Token Format (Error)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_token\": \"this.is.not.a.valid.jwt.token\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/auth/google/login/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "auth",
+            "google",
+            "login",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Use Token - Create Post with OAuth Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Token {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"post_type\": \"text\",\n  \"title\": \"Posted after Google OAuth\",\n  \"content\": \"This post was created by a Google OAuth authenticated user\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/factory/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "factory",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "[EXAMPLE] Real Google ID Token Format",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_token\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6IjExIn0.eyJpc3MiOlwiLi4uXCIsImp0aSI6XCIuLi5cIiwic3ViXCI6XCIxMjM0NTY3ODlcIixcIm5hbWVcIjpcIkpvaG4gRG9lXCIsXCJnaXZlbl9uYW1lXCI6XCJKb2huXCIsXCJmYW1pbHlfbmFtZVwiOlwiRG9lXCIsXCJwaWN0dXJlXCI6XCJodHRwczpcIixcImVtYWlsXCI6XCJqb2huZG9lQGdtYWlsLmNvbVwiLFwiZW1haWxfdmVyaWZpZWRcIjp0cnVlLFwiY2xhaW1zXCI6e1wic3ViXCI6XCIxMjM0NTY3ODlcIixcIm5hbWVcIjpcIkpvaG4gRG9lXCIsXCJwaWN0dXJlXCI6XCIuLi5cIixcImVtYWlsXCI6XCJqb2huZG9lQGdtYWlsLmNvbVwiLFwiZW1haWxfdmVyaWZpZWRcIjp0cnVlfX0.signature_would_go_here\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/auth/google/login/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "auth",
+            "google",
+            "login",
+            ""
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

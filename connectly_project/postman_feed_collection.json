@@ -1,0 +1,472 @@
+{
+  "info": {
+    "_postman_id": "feed-api-collection",
+    "name": "Connectly News Feed API",
+    "description": "Comprehensive collection for testing the Connectly News Feed endpoint with pagination, sorting, and filtering",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Feed - Basic Request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""]
+        },
+        "description": "Get the news feed with default settings (page=1, page_size=10, sorted by created_at)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Pagination Page 1",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?page=1&page_size=5",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "description": "Get the first page of the feed with 5 posts per page"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Pagination Page 2",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?page=2&page_size=5",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "page",
+              "value": "2"
+            },
+            {
+              "key": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "description": "Get the second page of the feed with 5 posts per page"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Post Type (text)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?post_type=text",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "post_type",
+              "value": "text"
+            }
+          ]
+        },
+        "description": "Get feed filtered by post_type=text"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Post Type (image)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?post_type=image",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "post_type",
+              "value": "image"
+            }
+          ]
+        },
+        "description": "Get feed filtered by post_type=image"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Multiple Post Types",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?post_type=text,video",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "post_type",
+              "value": "text,video"
+            }
+          ]
+        },
+        "description": "Get feed filtered by multiple post_types (text and video)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Author ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?author_id=1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "author_id",
+              "value": "1"
+            }
+          ]
+        },
+        "description": "Get feed filtered by specific author (replace 1 with actual author_id)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Search in Title",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?search=Python",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "search",
+              "value": "Python"
+            }
+          ]
+        },
+        "description": "Search feed by title or content (case-insensitive)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Search in Content",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?search=Django",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "search",
+              "value": "Django"
+            }
+          ]
+        },
+        "description": "Search feed content (searches both title and content)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Sort by Created At (Default)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?sort_by=created_at",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "sort_by",
+              "value": "created_at"
+            }
+          ]
+        },
+        "description": "Sort feed by creation date (most recent first)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Sort by Likes Count",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?sort_by=likes_count",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "sort_by",
+              "value": "likes_count"
+            }
+          ]
+        },
+        "description": "Sort feed by number of likes (most liked first)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Date Range",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?date_from=2024-01-01&date_to=2024-12-31",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "date_from",
+              "value": "2024-01-01"
+            },
+            {
+              "key": "date_to",
+              "value": "2024-12-31"
+            }
+          ]
+        },
+        "description": "Get feed filtered by date range (YYYY-MM-DD format)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Filter by Date From",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?date_from=2024-01-01",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "date_from",
+              "value": "2024-01-01"
+            }
+          ]
+        },
+        "description": "Get feed from a specific date onwards"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Combined Filters",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?post_type=text&author_id=1&sort_by=likes_count&page=1&page_size=10",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "post_type",
+              "value": "text"
+            },
+            {
+              "key": "author_id",
+              "value": "1"
+            },
+            {
+              "key": "sort_by",
+              "value": "likes_count"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        },
+        "description": "Get feed with multiple filters and sorting combined"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Max Page Size",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?page_size=50",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "page_size",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Get feed with maximum page size (50 posts)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Invalid Post Type (Error)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?post_type=invalid_type",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "post_type",
+              "value": "invalid_type"
+            }
+          ]
+        },
+        "description": "Test error handling with invalid post_type (should return 400)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Invalid Page Size (Error)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?page_size=100",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "page_size",
+              "value": "100"
+            }
+          ]
+        },
+        "description": "Test error handling with page_size > 50 (should return 400)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Invalid Author ID (Error)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?author_id=not_a_number",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "author_id",
+              "value": "not_a_number"
+            }
+          ]
+        },
+        "description": "Test error handling with non-numeric author_id (should return 400)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Invalid Sort By (Error)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?sort_by=invalid_sort",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "sort_by",
+              "value": "invalid_sort"
+            }
+          ]
+        },
+        "description": "Test error handling with invalid sort_by parameter (should return 400)"
+      },
+      "response": []
+    },
+    {
+      "name": "Feed - Invalid Date Format (Error)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/posts/feed/?date_from=01-01-2024",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["posts", "feed", ""],
+          "query": [
+            {
+              "key": "date_from",
+              "value": "01-01-2024"
+            }
+          ]
+        },
+        "description": "Test error handling with invalid date format (should return 400)"
+      },
+      "response": []
+    }
+  ]
+}

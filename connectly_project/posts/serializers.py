@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import User, Post, Comment
+from django.contrib.auth.models import User
+from .models import Post, Comment, Like
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,11 +11,17 @@ class UserSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     comments = serializers.StringRelatedField(many=True, read_only=True)
-
+    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
 
     class Meta:
         model = Post
-        fields = ['id', 'content', 'author', 'created_at', 'comments']
+        fields = ['id', 'content', 'author', 'created_at', 'comments', 'likes_count']
+
+
+class LikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Like
+        fields = ['id', 'user', 'post', 'created_at']
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -34,3 +41,27 @@ class CommentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Author not found.")
         return value
 
+
+class FeedSerializer(serializers.ModelSerializer):
+    """
+    Serializer for news feed posts with optimized data:
+    - Author details (nested)
+    - Like and comment counts
+    - Whether current user liked it
+    """
+    author = UserSerializer(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    user_liked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'content', 'author', 'created_at', 'post_type', 
+                  'likes_count', 'comments_count', 'user_liked']
+
+    def get_user_liked(self, obj):
+        """Check if current request user liked this post"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(user=request.user).exists()
+        return False
