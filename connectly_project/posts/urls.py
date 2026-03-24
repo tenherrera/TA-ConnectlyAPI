@@ -18,6 +18,7 @@ urlpatterns = [
     path('posts/<int:pk>/comment/', views.CommentCreateView.as_view(), name='post-comment'),
     path('posts/<int:pk>/comments/', views.PostCommentsView.as_view(), name='post-comments'),
     path('posts/<int:pk>/', views.PostDetailView.as_view(), name='post_detail'),
+    path('comments/<int:pk>/', views.CommentDetailView.as_view(), name='comment_detail'),
     path('protected/', views.ProtectedView.as_view(), name='protected'),
     path('factory/', CreatePostView.as_view(), name='post-factory'),
 ]

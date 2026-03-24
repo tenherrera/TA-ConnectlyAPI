@@ -1,13 +1,15 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.test import APIClient
-from posts.models import Post
+from posts.models import Comment, Post, UserProfile
 import json
 import base64
 
 
 class LikesCommentsAPITest(TestCase):
     def setUp(self):
+        cache.clear()
         User = get_user_model()
         self.username = 'apitest'
         self.password = 'pass1234'
@@ -80,6 +82,7 @@ class GoogleOAuthTest(TestCase):
     """Test Google OAuth login endpoint"""
     
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
     
     def create_mock_id_token(self, email='testuser@gmail.com', name='Test User'):
@@ -175,10 +178,11 @@ class FeedAPITest(TestCase):
     """Test the news feed endpoint with pagination, sorting, and filtering"""
     
     def setUp(self):
+        cache.clear()
         User = get_user_model()
         # Create test users
-        self.user1 = User.objects.create_user(username='user1', email='user1@test.com')
-        self.user2 = User.objects.create_user(username='user2', email='user2@test.com')
+        self.user1 = User.objects.create_user(username='user1', email='user1@test.com', password='user1pass123')
+        self.user2 = User.objects.create_user(username='user2', email='user2@test.com', password='user2pass123')
         
         # Create posts with different types and timestamps
         self.post1 = Post.objects.create(
@@ -367,3 +371,219 @@ class FeedAPITest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['page'], 1)
         self.assertEqual(resp.data['page_size'], 10)
+
+    def test_feed_pagination_page_out_of_range(self):
+        """Test feed with page beyond available results"""
+        resp = self.client.get('/posts/feed/?page=99&page_size=2')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('error', resp.data)
+
+    def test_feed_cache_miss_then_hit(self):
+        """Test feed responses are cached between identical requests"""
+        first_resp = self.client.get('/posts/feed/?page=1&page_size=2')
+        second_resp = self.client.get('/posts/feed/?page=1&page_size=2')
+
+        self.assertEqual(first_resp.status_code, 200)
+        self.assertEqual(second_resp.status_code, 200)
+        self.assertEqual(first_resp['X-Cache'], 'MISS')
+        self.assertEqual(second_resp['X-Cache'], 'HIT')
+        self.assertEqual(first_resp.data, second_resp.data)
+
+    def test_feed_cache_invalidated_after_post_create(self):
+        """Test feed cache is invalidated when new posts are created"""
+        first_resp = self.client.get('/posts/feed/')
+        self.assertEqual(first_resp['X-Cache'], 'MISS')
+
+        login_resp = self.client.post(
+            '/posts/login/',
+            {'username': 'user1', 'password': 'user1pass123'},
+            format='json'
+        )
+        token = login_resp.json().get('token')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+
+        create_resp = self.client.post(
+            '/posts/factory/',
+            {
+                'post_type': 'text',
+                'title': 'Fresh Post',
+                'content': 'Created after first request',
+                'privacy': Post.PRIVACY_PUBLIC,
+            },
+            format='json'
+        )
+        self.assertEqual(create_resp.status_code, 201)
+
+        self.client.credentials()
+
+        second_resp = self.client.get('/posts/feed/')
+        self.assertEqual(second_resp.status_code, 200)
+        self.assertEqual(second_resp['X-Cache'], 'MISS')
+        self.assertEqual(second_resp.data['count'], 4)
+
+
+class PrivacyAndRBACAPITest(TestCase):
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.client = APIClient()
+
+        self.owner_password = 'ownerpass123'
+        self.viewer_password = 'viewerpass123'
+        self.admin_password = 'adminpass123'
+
+        self.owner = User.objects.create_user(
+            username='owner',
+            email='owner@test.com',
+            password=self.owner_password
+        )
+        self.viewer = User.objects.create_user(
+            username='viewer',
+            email='viewer@test.com',
+            password=self.viewer_password
+        )
+        self.admin = User.objects.create_user(
+            username='adminuser',
+            email='admin@test.com',
+            password=self.admin_password
+        )
+        self.admin.profile.role = UserProfile.ROLE_ADMIN
+        self.admin.profile.save()
+
+        self.public_post = Post.objects.create(
+            title='Public Post',
+            content='Visible to everyone',
+            author=self.owner,
+            privacy=Post.PRIVACY_PUBLIC,
+            post_type='text'
+        )
+        self.private_post = Post.objects.create(
+            title='Private Post',
+            content='Visible only to owner',
+            author=self.owner,
+            privacy=Post.PRIVACY_PRIVATE,
+            post_type='text'
+        )
+        self.comment = Comment.objects.create(
+            text='Admin should be able to delete this',
+            author=self.viewer,
+            post=self.public_post
+        )
+
+    def authenticate(self, username, password):
+        response = self.client.post(
+            '/posts/login/',
+            {'username': username, 'password': password},
+            format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        token = response.json().get('token')
+        self.assertTrue(token)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+
+    def test_private_post_owner_can_view(self):
+        self.authenticate('owner', self.owner_password)
+        response = self.client.get(f'/posts/posts/{self.private_post.id}/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['id'], self.private_post.id)
+        self.assertEqual(response.data['privacy'], Post.PRIVACY_PRIVATE)
+
+    def test_private_post_other_user_cannot_view(self):
+        self.authenticate('viewer', self.viewer_password)
+        response = self.client.get(f'/posts/posts/{self.private_post.id}/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('permission', response.data['error'].lower())
+
+    def test_private_post_guest_cannot_view(self):
+        response = self.client.get(f'/posts/posts/{self.private_post.id}/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('permission', response.data['error'].lower())
+
+    def test_feed_hides_other_users_private_posts(self):
+        self.authenticate('viewer', self.viewer_password)
+        response = self.client.get('/posts/feed/')
+
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {post['id'] for post in response.data['results']}
+        self.assertIn(self.public_post.id, returned_ids)
+        self.assertNotIn(self.private_post.id, returned_ids)
+
+    def test_feed_includes_private_posts_for_owner(self):
+        self.authenticate('owner', self.owner_password)
+        response = self.client.get('/posts/feed/')
+
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {post['id'] for post in response.data['results']}
+        self.assertIn(self.public_post.id, returned_ids)
+        self.assertIn(self.private_post.id, returned_ids)
+
+    def test_admin_can_delete_post(self):
+        self.authenticate('adminuser', self.admin_password)
+        response = self.client.delete(f'/posts/posts/{self.public_post.id}/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Post.objects.filter(id=self.public_post.id).exists())
+
+    def test_non_admin_cannot_delete_post(self):
+        self.authenticate('owner', self.owner_password)
+        response = self.client.delete(f'/posts/posts/{self.public_post.id}/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Post.objects.filter(id=self.public_post.id).exists())
+
+    def test_guest_cannot_delete_post(self):
+        response = self.client.delete(f'/posts/posts/{self.public_post.id}/')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(Post.objects.filter(id=self.public_post.id).exists())
+
+    def test_admin_can_delete_comment(self):
+        self.authenticate('adminuser', self.admin_password)
+        response = self.client.delete(f'/posts/comments/{self.comment.id}/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Comment.objects.filter(id=self.comment.id).exists())
+
+    def test_non_admin_cannot_delete_comment(self):
+        self.authenticate('viewer', self.viewer_password)
+        response = self.client.delete(f'/posts/comments/{self.comment.id}/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Comment.objects.filter(id=self.comment.id).exists())
+
+    def test_create_user_assigns_role(self):
+        response = self.client.post(
+            '/posts/users/',
+            {
+                'username': 'newadmin',
+                'email': 'newadmin@test.com',
+                'password': 'newadminpass123',
+                'role': UserProfile.ROLE_ADMIN,
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 201)
+        created_user = get_user_model().objects.get(username='newadmin')
+        self.assertEqual(created_user.profile.role, UserProfile.ROLE_ADMIN)
+
+    def test_create_post_accepts_privacy_field(self):
+        self.authenticate('owner', self.owner_password)
+        response = self.client.post(
+            '/posts/factory/',
+            {
+                'post_type': 'text',
+                'title': 'Owner private post',
+                'content': 'Confidential',
+                'privacy': Post.PRIVACY_PRIVATE,
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 201)
+        created_post = Post.objects.get(id=response.data['post_id'])
+        self.assertEqual(created_post.privacy, Post.PRIVACY_PRIVATE)

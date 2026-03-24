@@ -126,6 +126,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'connectly-cache',
+        'TIMEOUT': 60,
+    }
+}
+
 # HTTPS Settings
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True

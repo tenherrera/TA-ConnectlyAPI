@@ -1,11 +1,16 @@
 import json
+import hashlib
 from singletons.logger_singleton import LoggerSingleton
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from .models import Post, User, Comment, Like  # Added Comment here; like model added
+from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.shortcuts import get_object_or_404
+from .models import Post, Comment, Like, UserProfile
+from django.core.cache import cache
+from django.core.paginator import EmptyPage, Paginator
 from rest_framework.permissions import IsAuthenticated
-from .permissions import IsPostAuthor
+from .permissions import IsPostAuthor, IsAdminRole, can_view_post
 from rest_framework.views import APIView       
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
@@ -16,6 +21,31 @@ from factories.post_factory import PostFactory
 from rest_framework.authtoken.models import Token
 from django.db.models import Count, Q
 from django.utils.dateparse import parse_date
+
+
+FEED_CACHE_VERSION_KEY = 'feed_cache_version'
+FEED_CACHE_TIMEOUT = 60
+
+
+def get_feed_cache_version():
+    version = cache.get(FEED_CACHE_VERSION_KEY)
+    if version is None:
+        version = 1
+        cache.set(FEED_CACHE_VERSION_KEY, version, None)
+    return version
+
+
+def invalidate_feed_cache():
+    try:
+        cache.incr(FEED_CACHE_VERSION_KEY)
+    except ValueError:
+        cache.set(FEED_CACHE_VERSION_KEY, 2, None)
+
+
+def build_feed_cache_key(request):
+    visibility_scope = f"user:{request.user.id}" if request.user.is_authenticated else 'guest'
+    raw_key = f"feed:{get_feed_cache_version()}:{visibility_scope}:{request.get_full_path()}"
+    return f"feed:{hashlib.md5(raw_key.encode('utf-8')).hexdigest()}"
 
 
 # Function 1: To get users
@@ -32,15 +62,13 @@ def create_user(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-
-            # INSTRUCTION: Update user creation to use Django's create_user method
-            user = User.objects.create_user(
-                username=data['username'], 
-                email=data['email'], 
-                password=data['password'] # Added password field
+            serializer = UserSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            return JsonResponse(
+                {'id': user.id, 'role': serializer.data['role'], 'message': 'User created successfully'},
+                status=201
             )
-
-            return JsonResponse({'id': user.id, 'message': 'User created successfully'}, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
@@ -59,7 +87,15 @@ def create_post(request):
         try:
             data = json.loads(request.body)
             author = User.objects.get(id=data['author'])
-            post = Post.objects.create(content=data['content'], author=author)
+            post = Post.objects.create(
+                title=data.get('title', 'Untitled'),
+                content=data['content'],
+                author=author,
+                post_type=data.get('post_type', 'text'),
+                metadata=data.get('metadata', {}),
+                privacy=data.get('privacy', Post.PRIVACY_PUBLIC)
+            )
+            invalidate_feed_cache()
             return JsonResponse({'id': post.id, 'message': 'Post created successfully'}, status=201)
         except User.DoesNotExist:
             return JsonResponse({'error': 'Author not found'}, status=404)
@@ -80,8 +116,13 @@ def verify_password(request):
                 login(request, user)
                 
                 token, _ = Token.objects.get_or_create(user=user)
+                profile, _ = UserProfile.objects.get_or_create(user=user)
 
-                return JsonResponse({'token': token.key, 'message': 'Authentication successful!'})
+                return JsonResponse({
+                    'token': token.key,
+                    'role': profile.role,
+                    'message': 'Authentication successful!'
+                })
             else:
                 return JsonResponse({'error': 'Invalid credentials.'}, status=401)
         except Exception as e:
@@ -103,16 +144,26 @@ class UserListCreate(APIView):
 
 
 class PostListCreate(APIView):
+    authentication_classes = [TokenAuthentication]
+
     def get(self, request):
         # Initialize the logger
         logger = LoggerSingleton().get_logger()
         logger.info("User requested the list of posts!")
         
-        posts = Post.objects.all()
+        if request.user.is_authenticated:
+            posts = Post.objects.filter(
+                Q(privacy=Post.PRIVACY_PUBLIC) | Q(author=request.user)
+            )
+        else:
+            posts = Post.objects.filter(privacy=Post.PRIVACY_PUBLIC)
         serializer = PostSerializer(posts, many=True)
         return Response(serializer.data)
 
     def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             # Call the Factory to handle the heavy lifting
             new_post = PostFactory.create_post(
@@ -122,6 +173,9 @@ class PostListCreate(APIView):
                 content=request.data.get('content'),
                 metadata=request.data.get('metadata')
             )
+            new_post.privacy = request.data.get('privacy', Post.PRIVACY_PUBLIC)
+            new_post.save()
+            invalidate_feed_cache()
 
             # Serialize the result to return it to the user
             return Response(PostSerializer(new_post).data, status=status.HTTP_201_CREATED)
@@ -140,6 +194,7 @@ class CommentListCreate(APIView):
 
 # News Feed endpoint with pagination and filtering
 class FeedView(APIView):
+    authentication_classes = [TokenAuthentication]
     """
     GET /feed/ - News feed with pagination, sorting, and filtering
     
@@ -156,6 +211,13 @@ class FeedView(APIView):
     
     def get(self, request):
         try:
+            cache_key = build_feed_cache_key(request)
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                response = Response(cached_payload, status=status.HTTP_200_OK)
+                response['X-Cache'] = 'HIT'
+                return response
+
             # Get pagination parameters
             page = int(request.query_params.get('page', 1))
             page_size = int(request.query_params.get('page_size', 10))
@@ -176,6 +238,13 @@ class FeedView(APIView):
                 likes_count=Count('likes'),
                 comments_count=Count('comments')
             ).select_related('author').prefetch_related('likes')
+
+            if request.user.is_authenticated:
+                queryset = queryset.filter(
+                    Q(privacy=Post.PRIVACY_PUBLIC) | Q(author=request.user)
+                )
+            else:
+                queryset = queryset.filter(privacy=Post.PRIVACY_PUBLIC)
             
             # Apply filters
             # Filter by post_type
@@ -244,18 +313,21 @@ class FeedView(APIView):
             
             # Get total count before pagination
             total_count = queryset.count()
-            
-            # Calculate pagination
-            start = (page - 1) * page_size
-            end = start + page_size
-            total_pages = (total_count + page_size - 1) // page_size
-            
-            # Get paginated results
-            paginated_posts = queryset[start:end]
+
+            paginator = Paginator(queryset, page_size)
+            total_pages = paginator.num_pages
+
+            try:
+                paginated_posts = paginator.page(page)
+            except EmptyPage:
+                return Response(
+                    {'error': 'page exceeds available results'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Serialize
             serializer = FeedSerializer(
-                paginated_posts, 
+                paginated_posts.object_list,
                 many=True,
                 context={'request': request}
             )
@@ -264,17 +336,17 @@ class FeedView(APIView):
             next_page = None
             prev_page = None
             
-            if page < total_pages:
+            if paginated_posts.has_next():
                 next_page = request.build_absolute_uri(
                     f'?page={page + 1}&page_size={page_size}&sort_by={sort_by}'
                 )
             
-            if page > 1:
+            if paginated_posts.has_previous():
                 prev_page = request.build_absolute_uri(
                     f'?page={page - 1}&page_size={page_size}&sort_by={sort_by}'
                 )
             
-            return Response({
+            payload = {
                 'count': total_count,
                 'next': next_page,
                 'previous': prev_page,
@@ -282,7 +354,11 @@ class FeedView(APIView):
                 'page_size': page_size,
                 'total_pages': total_pages,
                 'results': serializer.data
-            }, status=status.HTTP_200_OK)
+            }
+            cache.set(cache_key, payload, FEED_CACHE_TIMEOUT)
+            response = Response(payload, status=status.HTTP_200_OK)
+            response['X-Cache'] = 'MISS'
+            return response
         
         except ValueError as e:
             return Response(
@@ -303,31 +379,42 @@ class FeedView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class PostDetailView(APIView):
-    # Instruction: Enforce role-based permissions
-    permission_classes = [IsAuthenticated, IsPostAuthor]
+    authentication_classes = [TokenAuthentication]
 
     def get(self, request, pk):
-        try:
-            post = Post.objects.get(pk=pk)
-
-            # Instruction: Check object permissions manually for the object
-            self.check_object_permissions(request, post)
-
-            return Response({"content": post.content, "author": post.author.username})
-        except Post.DoesNotExist:
-            return Response({"error": "Post not found"}, status=404)
+        post = get_object_or_404(Post, pk=pk)
+        if not can_view_post(request.user, post):
+            return Response({"error": "You do not have permission to view this post."}, status=403)
+        return Response(PostSerializer(post).data)
 
     # (Optional) Adding PUT to test editing permissions later
     def put(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             post = Post.objects.get(pk=pk)
-            self.check_object_permissions(request, post) # This triggers IsPostAuthor
+            if not IsPostAuthor().has_object_permission(request, self, post):
+                return Response({'error': 'You do not have permission to edit this post.'}, status=status.HTTP_403_FORBIDDEN)
 
             post.content = request.data.get("content", post.content)
+            post.title = request.data.get("title", post.title)
+            post.privacy = request.data.get("privacy", post.privacy)
             post.save()
-            return Response({"message": "Post updated successfully", "content": post.content})
+            invalidate_feed_cache()
+            return Response({"message": "Post updated successfully", "post": PostSerializer(post).data})
         except Post.DoesNotExist:
             return Response({"error": "Post not found"}, status=404)
+
+    def delete(self, request, pk):
+        post = get_object_or_404(Post, pk=pk)
+        if not IsAdminRole().has_permission(request, self):
+            if request.user.is_authenticated:
+                return Response({'error': 'Admin role required.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+        post.delete()
+        invalidate_feed_cache()
+        return Response({'message': 'Post deleted successfully.'}, status=status.HTTP_200_OK)
 
 class ProtectedView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -351,6 +438,9 @@ class CreatePostView(APIView):
                 content=data.get('content', ''),
                 metadata=data.get('metadata', {})
             )
+            post.privacy = data.get('privacy', Post.PRIVACY_PUBLIC)
+            post.save()
+            invalidate_feed_cache()
             return Response({'message': 'Post created successfully!', 'post_id': post.id}, status=status.HTTP_201_CREATED)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -367,8 +457,12 @@ class LikePostView(APIView):
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=404)
 
+        if not can_view_post(request.user, post):
+            return Response({'error': 'You do not have permission to interact with this post.'}, status=status.HTTP_403_FORBIDDEN)
+
         like, created = Like.objects.get_or_create(user=request.user, post=post)
         if created:
+            invalidate_feed_cache()
             return Response({'message': 'Post liked'}, status=status.HTTP_201_CREATED)
         return Response({'message': 'Already liked'}, status=status.HTTP_200_OK)
 
@@ -383,20 +477,42 @@ class CommentCreateView(APIView):
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=404)
 
+        if not can_view_post(request.user, post):
+            return Response({'error': 'You do not have permission to interact with this post.'}, status=status.HTTP_403_FORBIDDEN)
+
         text = request.data.get('text') or request.data.get('content')
         if not text:
             return Response({'error': 'No comment text provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         comment = Comment.objects.create(post=post, author=request.user, text=text)
+        invalidate_feed_cache()
         return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
 
 class PostCommentsView(APIView):
+    authentication_classes = [TokenAuthentication]
+
     def get(self, request, pk):
         try:
             post = Post.objects.get(pk=pk)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=404)
+        if not can_view_post(request.user, post):
+            return Response({'error': 'You do not have permission to view comments for this post.'}, status=status.HTTP_403_FORBIDDEN)
         comments = post.comments.all()
         serializer = CommentSerializer(comments, many=True)
         return Response(serializer.data)
+
+
+class CommentDetailView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    def delete(self, request, pk):
+        comment = get_object_or_404(Comment, pk=pk)
+        if not IsAdminRole().has_permission(request, self):
+            if request.user.is_authenticated:
+                return Response({'error': 'Admin role required.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+        comment.delete()
+        invalidate_feed_cache()
+        return Response({'message': 'Comment deleted successfully.'}, status=status.HTTP_200_OK)

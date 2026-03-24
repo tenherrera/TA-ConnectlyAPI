@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Connectly - Likes & Comments",
+    "name": "Connectly - RBAC & Privacy",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,13 +9,33 @@
       "value": "http://127.0.0.1:8000"
     },
     {
-      "key": "token",
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "ownerToken",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "publicPostId",
+      "value": ""
+    },
+    {
+      "key": "privatePostId",
+      "value": ""
+    },
+    {
+      "key": "commentId",
       "value": ""
     }
   ],
   "item": [
     {
-      "name": "Login (get token)",
+      "name": "Create Admin User",
       "request": {
         "method": "POST",
         "header": [
@@ -26,7 +46,109 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"smoketest\",\n  \"password\": \"password\"\n}"
+          "raw": "{\n  \"username\": \"postman_admin\",\n  \"email\": \"postman_admin@test.com\",\n  \"password\": \"adminpass123\",\n  \"role\": \"admin\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/users/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "users",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Owner User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_owner\",\n  \"email\": \"postman_owner@test.com\",\n  \"password\": \"ownerpass123\",\n  \"role\": \"user\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/users/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "users",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Regular User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_user\",\n  \"email\": \"postman_user@test.com\",\n  \"password\": \"userpass123\",\n  \"role\": \"user\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/users/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "users",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Admin login succeeded', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "    pm.collectionVariables.set('adminToken', data.token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_admin\",\n  \"password\": \"adminpass123\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/posts/login/",
@@ -43,29 +165,45 @@
       "response": []
     },
     {
-      "name": "Like Post",
+      "name": "Login Owner",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Owner login succeeded', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "    pm.collectionVariables.set('ownerToken', data.token);",
+              "}"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
-          },
-          {
-            "key": "Authorization",
-            "value": "Token {{token}}"
           }
         ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_owner\",\n  \"password\": \"ownerpass123\"\n}"
+        },
         "url": {
-          "raw": "{{baseUrl}}/posts/posts/10/like/",
+          "raw": "{{baseUrl}}/posts/login/",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "posts",
-            "posts",
-            "10",
-            "like",
+            "login",
             ""
           ]
         }
@@ -73,7 +211,71 @@
       "response": []
     },
     {
-      "name": "Comment on Post",
+      "name": "Login Regular User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Regular user login succeeded', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "    pm.collectionVariables.set('userToken', data.token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_user\",\n  \"password\": \"userpass123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/login/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "login",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Public Post",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Public post created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.post_id) {",
+              "    pm.collectionVariables.set('publicPostId', data.post_id);",
+              "}"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
@@ -83,22 +285,122 @@
           },
           {
             "key": "Authorization",
-            "value": "Token {{token}}"
+            "value": "Token {{ownerToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"text\": \"This is a Postman test comment\"\n}"
+          "raw": "{\n  \"post_type\": \"text\",\n  \"title\": \"Owner Public Post\",\n  \"content\": \"Everyone should see this\",\n  \"privacy\": \"public\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/posts/posts/10/comment/",
+          "raw": "{{baseUrl}}/posts/factory/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "factory",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Private Post",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Private post created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.post_id) {",
+              "    pm.collectionVariables.set('privatePostId', data.post_id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Token {{ownerToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"post_type\": \"text\",\n  \"title\": \"Owner Private Post\",\n  \"content\": \"Only the owner should see this\",\n  \"privacy\": \"private\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/factory/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "factory",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Comment On Public Post As Regular User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Comment created on public post', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "var data = pm.response.json();",
+              "if (data.id) {",
+              "    pm.collectionVariables.set('commentId', data.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Token {{userToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"This comment will be used for admin delete testing\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts/posts/{{publicPostId}}/comment/",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "posts",
             "posts",
-            "10",
+            "{{publicPostId}}",
             "comment",
             ""
           ]
@@ -107,25 +409,24 @@
       "response": []
     },
     {
-      "name": "Get Post Comments",
+      "name": "Get Private Post As Owner",
       "request": {
         "method": "GET",
         "header": [
           {
             "key": "Authorization",
-            "value": "Token {{token}}"
+            "value": "Token {{ownerToken}}"
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/posts/posts/10/comments/",
+          "raw": "{{baseUrl}}/posts/posts/{{privatePostId}}/",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "posts",
             "posts",
-            "10",
-            "comments",
+            "{{privatePostId}}",
             ""
           ]
         }
@@ -133,89 +434,192 @@
       "response": []
     },
     {
-      "name": "[EDGE CASE] Like Post Multiple Times",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Authorization",
-            "value": "Token {{token}}"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/posts/posts/10/like/",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "posts",
-            "posts",
-            "10",
-            "like",
-            ""
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "[EDGE CASE] Comment on Non-Existent Post",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Authorization",
-            "value": "Token {{token}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"text\": \"This should fail - post doesn't exist\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/posts/posts/99999/comment/",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "posts",
-            "posts",
-            "99999",
-            "comment",
-            ""
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "[EDGE CASE] Get Comments from Non-Existent Post",
+      "name": "Get Private Post As Other User",
       "request": {
         "method": "GET",
         "header": [
           {
             "key": "Authorization",
-            "value": "Token {{token}}"
+            "value": "Token {{userToken}}"
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/posts/posts/99999/comments/",
+          "raw": "{{baseUrl}}/posts/posts/{{privatePostId}}/",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "posts",
             "posts",
-            "99999",
+            "{{privatePostId}}",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Private Post As Guest",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/posts/posts/{{privatePostId}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "posts",
+            "{{privatePostId}}",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Feed As Owner",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{ownerToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/feed/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "feed",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Feed As Other User",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{userToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/feed/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "feed",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Post As Admin",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/posts/{{publicPostId}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "posts",
+            "{{publicPostId}}",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Post As Non-Admin",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{userToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/posts/{{publicPostId}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "posts",
+            "{{publicPostId}}",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Comment As Admin",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/comments/{{commentId}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
             "comments",
+            "{{commentId}}",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Comment As Non-Admin",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{userToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/comments/{{commentId}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "comments",
+            "{{commentId}}",
             ""
           ]
         }
