@@ -113,5 +113,5 @@ Automated tests cover:
 - cache invalidation after post creation
 
 See:
-- [`posts/tests.py`](c:\Users\masof\Downloads\MO-IT152-main\MO-IT152-main\connectly_project\posts\tests.py)
-- [`TEST_RESULTS_REPORT.md`](c:\Users\masof\Downloads\MO-IT152-main\MO-IT152-main\connectly_project\TEST_RESULTS_REPORT.md)
+- [`posts/tests.py`](../posts/tests.py)
+- [`TEST_RESULTS_REPORT.md`](./TEST_RESULTS_REPORT.md)
